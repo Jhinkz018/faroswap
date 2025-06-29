@@ -1,0 +1,17 @@
+{
+  "name": "autopharos-swap",
+  "version": "1.0.0",
+  "description": "Auto-swap script using DODO API and ethers.js on the Pharos chain",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "start": "node main.js"
+  },
+  "dependencies": {
+    "abort-controller": "^3.0.0",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.10.0",
+    "node-fetch": "^3.3.2",
+    "ora": "^6.3.1"
+  }
+}
