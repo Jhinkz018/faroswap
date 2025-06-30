@@ -2,10 +2,11 @@
 import fetch from 'node-fetch';
 import AbortController from 'abort-controller';
 import { ethers } from 'ethers';
-import ora from 'ora';
 import { buildFallbackProvider, ERC20_ABI } from './auto_swap_utilities.js';
 import dotenv from 'dotenv';
-import readline from 'readline';
+import blessed from 'blessed';
+import chalk from 'chalk';
+import figlet from 'figlet';
 dotenv.config();
 
 const TOKENS = {
@@ -21,15 +22,87 @@ const PHAROS_RPC_URLS = [
   'https://testnet.dplabs-internal.com'
 ];
 
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+let screen;
+let menuBox;
+let logBox;
+let promptBox;
+let headerBox;
+
+function initUI() {
+  screen = blessed.screen({ smartCSR: true, title: 'Faros AutoSwap' });
+
+  headerBox = blessed.box({
+    top: 0,
+    left: 'center',
+    width: '100%',
+    height: 5,
+    align: 'center',
+    tags: true
+  });
+
+  menuBox = blessed.list({
+    top: 6,
+    left: 0,
+    width: '30%',
+    height: '100%-6',
+    keys: true,
+    mouse: true,
+    style: {
+      selected: { bg: 'blue', fg: 'white' },
+      border: { fg: 'cyan' }
+    },
+    border: { type: 'line' },
+    items: ['Swap Tokens', 'Show Balances', 'Quit']
+  });
+
+  logBox = blessed.log({
+    top: 6,
+    left: '30%',
+    width: '70%',
+    height: '100%-6',
+    border: { type: 'line' },
+    tags: true,
+    scrollbar: { ch: ' ', style: { bg: 'cyan' } }
+  });
+
+  promptBox = blessed.prompt({
+    parent: screen,
+    keys: true,
+    left: 'center',
+    top: 'center',
+    width: '50%',
+    height: 'shrink',
+    border: 'line',
+    tags: true,
+    hidden: true
+  });
+
+  screen.append(headerBox);
+  screen.append(menuBox);
+  screen.append(logBox);
+
+  figlet('AutoSwap', (err, data) => {
+    headerBox.setContent(chalk.cyan(data));
+    screen.render();
+  });
+
+  screen.key(['escape', 'q', 'C-c'], () => process.exit(0));
+  menuBox.focus();
+  screen.render();
+}
+
+function log(message) {
+  if (logBox) logBox.log(message);
+  else console.log(message);
+}
 
 async function showAllBalances(address, provider) {
-  console.log('\n💰 Token Balances:');
+  log('\n💰 Token Balances:');
   try {
     const native = await provider.getBalance(address);
-    console.log(` - PHRS (native): ${ethers.formatEther(native)} PHRS`);
+    log(` - PHRS (native): ${ethers.formatEther(native)} PHRS`);
   } catch (err) {
-    console.log(` - PHRS (native): Error fetching`);
+    log(` - PHRS (native): Error fetching`);
   }
 
   for (const [symbol, tokenAddr] of Object.entries(TOKENS)) {
@@ -40,10 +113,10 @@ async function showAllBalances(address, provider) {
         contract.balanceOf(address),
         contract.decimals()
       ]);
-      const formatted = Number(balance) / 10 ** Number(decimals);
-      console.log(` - ${symbol}: ${formatted}`);
+      const formatted = ethers.formatUnits(balance, decimals);
+      log(` - ${symbol}: ${formatted}`);
     } catch (e) {
-      console.log(` - ${symbol}: Error fetching`);
+      log(` - ${symbol}: Error fetching`);
     }
   }
 }
@@ -66,9 +139,9 @@ async function robustFetchDodoRoute(url) {
       const res = await fetchWithTimeout(url);
       const data = await res.json();
       if (data.status !== -1) return data;
-      console.warn(`Retry ${i + 1} DODO API status -1`);
+      log(`Retry ${i + 1} DODO API status -1`);
     } catch (e) {
-      console.warn(`Retry ${i + 1} failed:`, e.message);
+      log(`Retry ${i + 1} failed: ${e.message}`);
     }
     await new Promise(r => setTimeout(r, 1000));
   }
@@ -78,14 +151,14 @@ async function robustFetchDodoRoute(url) {
 async function fetchDodoRoute(fromAddr, toAddr, userAddr, amountWei) {
   const deadline = Math.floor(Date.now() / 1000) + 600;
   const url = `https://api.dodoex.io/route-service/v2/widget/getdodoroute?chainId=${PHAROS_CHAIN_ID}&deadLine=${deadline}&apikey=a37546505892e1a952&slippage=3.225&source=dodoV2AndMixWasm&toTokenAddress=${toAddr}&fromTokenAddress=${fromAddr}&userAddr=${userAddr}&estimateGas=true&fromAmount=${amountWei}`;
-  console.log('\n🌐 DODO API Request URL:', url);
+  log(`\n🌐 DODO API Request URL: ${url}`);
 
   try {
     const result = await robustFetchDodoRoute(url);
-    console.log('\n🧭 DODO Route Info fetched successfully');
+    log('\n🧭 DODO Route Info fetched successfully');
     return result.data;
   } catch (err) {
-    console.error('\n❌ DODO API fetch failed:', err.message);
+    log(`\n❌ DODO API fetch failed: ${err.message}`);
     throw err;
   }
 }
@@ -98,67 +171,89 @@ async function executeSwap(wallet, routeData) {
       value: BigInt(routeData.value),
       gasLimit: BigInt(routeData.gasLimit || 300000)
     });
-    console.log(`\n🚀 Swap Transaction sent! TX Hash: ${tx.hash}`);
+    log(`\n🚀 Swap Transaction sent! TX Hash: ${tx.hash}`);
     await tx.wait();
-    console.log('✅ Transaction confirmed!');
+    log('✅ Transaction confirmed!');
   } catch (e) {
-    console.error('❌ Swap TX failed:', e.message);
+    log(`❌ Swap TX failed: ${e.message}`);
   }
 }
 
 async function batchSwap(wallet, from, to, value, count) {
   for (let i = 0; i < count; i++) {
-    console.log(`\n🔁 Swap #${i + 1} of ${count}`);
+    log(`\n🔁 Swap #${i + 1} of ${count}`);
     try {
       const data = await fetchDodoRoute(from, to, wallet.address, value);
       await executeSwap(wallet, data);
     } catch (e) {
-      console.error(`❌ Swap #${i + 1} failed:`, e.message);
+      log(`❌ Swap #${i + 1} failed: ${e.message}`);
     }
     await new Promise(r => setTimeout(r, 1000)); // wait 1s between swaps
   }
 }
 
-function runSwapPrompt(wallet) {
-  rl.question('💱 Enter token symbol to swap TO (e.g., WBTC): ', (toSymbol) => {
-    rl.question('💸 Enter amount of PHRS to swap (in ETH): ', (amt) => {
-      rl.question('🔁 How many swaps to perform?: ', async (countStr) => {
-        try {
-          if (!amt || isNaN(amt)) throw new Error('Invalid amount');
-          const from = TOKENS.PHRS;
-          const to = TOKENS[toSymbol.toUpperCase()];
-          if (!to) throw new Error('Invalid symbol.');
-          const value = ethers.parseEther(amt);
-          const count = parseInt(countStr);
-          if (isNaN(count) || count < 1) throw new Error('Invalid swap count');
-          await batchSwap(wallet, from, to, value, count);
-        } catch (e) {
-          console.error('❌ Error:', e.message);
-        } finally {
-          runSwapPrompt(wallet); // loop again after completion
-        }
-      });
+function ask(question) {
+  return new Promise((resolve) => {
+    promptBox.input(question, '', (err, value) => {
+      resolve((value || '').trim());
     });
   });
 }
 
+async function handleSwap(wallet) {
+  const symbol = (await ask('💱 Enter token symbol to swap TO (e.g., WBTC):')).toUpperCase();
+  const amount = await ask('💸 Enter amount of PHRS to swap:');
+  const countStr = await ask('🔁 How many swaps to perform?');
+
+  try {
+    if (!amount || isNaN(amount)) throw new Error('Invalid amount');
+    const from = TOKENS.PHRS;
+    const to = TOKENS[symbol];
+    if (!to) throw new Error('Invalid symbol.');
+    const value = ethers.parseEther(amount);
+    const count = parseInt(countStr);
+    if (isNaN(count) || count < 1) throw new Error('Invalid swap count');
+    await batchSwap(wallet, from, to, value, count);
+  } catch (e) {
+    log(`❌ Error: ${e.message}`);
+  }
+}
+
+function mainMenu(wallet) {
+  menuBox.on('select', async (item) => {
+    const action = item.getText();
+    if (action === 'Quit') {
+      process.exit(0);
+    } else if (action === 'Show Balances') {
+      await showAllBalances(wallet.address, wallet.provider);
+    } else if (action === 'Swap Tokens') {
+      await handleSwap(wallet);
+    }
+    menuBox.select(0);
+    screen.render();
+  });
+}
+
 (async () => {
-  console.log('\n🚀 Starting AutoSwap Executor by 0xm3th');
+  initUI();
+  log('🚀 Starting AutoSwap Executor by 0xm3th');
 
   const provider = await buildFallbackProvider(PHAROS_RPC_URLS, PHAROS_CHAIN_ID, 'pharos');
   const pk = process.env.PRIVATE_KEY;
 
   if (!pk || !pk.startsWith('0x') || pk.length !== 66) {
-    console.error('❌ Invalid or missing PRIVATE_KEY in .env');
+    log('❌ Invalid or missing PRIVATE_KEY in .env');
     process.exit(1);
   }
 
   try {
     const wallet = new ethers.Wallet(pk, provider);
     await showAllBalances(wallet.address, provider);
-    runSwapPrompt(wallet);
+    mainMenu(wallet);
+    screen.render();
   } catch (err) {
-    console.error('❌ Wallet setup failed:', err.message);
+    log(`❌ Wallet setup failed: ${err.message}`);
     process.exit(1);
   }
+  screen.render();
 })();

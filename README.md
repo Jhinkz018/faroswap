@@ -12,7 +12,7 @@ A command-line tool for batch token swaps on the Pharos testnet using the DODO r
 * ⏱ Timeout protection using `AbortController`
 * 🌐 Fetches real-time DODO routes with slippage control
 * 🔐 Uses `.env` file to load your private key securely
-* 🚪 Includes graceful quit option (`q` or `quit`)
+* 🚪 Colorful TUI menu using **blessed**
 
 ---
 
@@ -60,15 +60,7 @@ On Pharos testnet:
 npm start
 ```
 
-Then follow the prompts:
-
-```
-🔱 Enter token symbol to swap TO (e.g., WBTC): WETH
-💸 Enter amount of PHRS to swap (in ETH): 1
-🔁 How many swaps to perform?: 3
-```
-
-To exit at any time, type `q` or `quit`.
+Launch the app and navigate the on-screen menu using your arrow keys. Select **Swap Tokens** to enter the token symbol, amount, and repeat count.
 
 ---
 
@@ -81,6 +73,12 @@ To exit at any time, type `q` or `quit`.
  - PHRS (native): 4826.35 PHRS
  - WETH: 0.0436
 ...
+
+╭─ Menu ─────────────────────────╮
+│ Swap Tokens                   │
+│ Show Balances                 │
+│ Quit                          │
+╰───────────────────────────────╯
 
 🔁 Swap #1 of 3
 🌐 DODO API Request URL: ...
