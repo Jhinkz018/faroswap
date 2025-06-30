@@ -5,7 +5,7 @@ import { ethers } from 'ethers';
 import ora from 'ora';
 import { buildFallbackProvider, ERC20_ABI } from './auto_swap_utilities.js';
 import dotenv from 'dotenv';
-import readline from 'readline';
+import inquirer from 'inquirer';
 dotenv.config();
 
 const TOKENS = {
@@ -20,8 +20,6 @@ const PHAROS_CHAIN_ID = 688688;
 const PHAROS_RPC_URLS = [
   'https://testnet.dplabs-internal.com'
 ];
-
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
 async function showAllBalances(address, provider) {
   console.log('\n💰 Token Balances:');
@@ -40,7 +38,7 @@ async function showAllBalances(address, provider) {
         contract.balanceOf(address),
         contract.decimals()
       ]);
-      const formatted = Number(balance) / 10 ** Number(decimals);
+      const formatted = ethers.formatUnits(balance, decimals);
       console.log(` - ${symbol}: ${formatted}`);
     } catch (e) {
       console.log(` - ${symbol}: Error fetching`);
@@ -119,27 +117,57 @@ async function batchSwap(wallet, from, to, value, count) {
   }
 }
 
-function runSwapPrompt(wallet) {
-  rl.question('💱 Enter token symbol to swap TO (e.g., WBTC): ', (toSymbol) => {
-    rl.question('💸 Enter amount of PHRS to swap (in ETH): ', (amt) => {
-      rl.question('🔁 How many swaps to perform?: ', async (countStr) => {
-        try {
-          if (!amt || isNaN(amt)) throw new Error('Invalid amount');
-          const from = TOKENS.PHRS;
-          const to = TOKENS[toSymbol.toUpperCase()];
-          if (!to) throw new Error('Invalid symbol.');
-          const value = ethers.parseEther(amt);
-          const count = parseInt(countStr);
-          if (isNaN(count) || count < 1) throw new Error('Invalid swap count');
-          await batchSwap(wallet, from, to, value, count);
-        } catch (e) {
-          console.error('❌ Error:', e.message);
-        } finally {
-          runSwapPrompt(wallet); // loop again after completion
-        }
-      });
+async function mainMenu(wallet) {
+  while (true) {
+    const { action } = await inquirer.prompt({
+      type: 'list',
+      name: 'action',
+      message: 'Select an option',
+      choices: [
+        { name: 'Swap Tokens', value: 'swap' },
+        { name: 'Show Balances', value: 'balance' },
+        { name: 'Quit', value: 'quit' }
+      ]
     });
-  });
+
+    if (action === 'quit') {
+      console.log('👋 Goodbye!');
+      process.exit(0);
+    } else if (action === 'balance') {
+      await showAllBalances(wallet.address, wallet.provider);
+    } else {
+      const answers = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'symbol',
+          message: '💱 Enter token symbol to swap TO (e.g., WBTC):'
+        },
+        {
+          type: 'input',
+          name: 'amount',
+          message: '💸 Enter amount of PHRS to swap:'
+        },
+        {
+          type: 'input',
+          name: 'count',
+          message: '🔁 How many swaps to perform?'
+        }
+      ]);
+
+      try {
+        if (!answers.amount || isNaN(answers.amount)) throw new Error('Invalid amount');
+        const from = TOKENS.PHRS;
+        const to = TOKENS[answers.symbol.toUpperCase()];
+        if (!to) throw new Error('Invalid symbol.');
+        const value = ethers.parseEther(answers.amount);
+        const count = parseInt(answers.count);
+        if (isNaN(count) || count < 1) throw new Error('Invalid swap count');
+        await batchSwap(wallet, from, to, value, count);
+      } catch (e) {
+        console.error('❌ Error:', e.message);
+      }
+    }
+  }
 }
 
 (async () => {
@@ -156,7 +184,7 @@ function runSwapPrompt(wallet) {
   try {
     const wallet = new ethers.Wallet(pk, provider);
     await showAllBalances(wallet.address, provider);
-    runSwapPrompt(wallet);
+    await mainMenu(wallet);
   } catch (err) {
     console.error('❌ Wallet setup failed:', err.message);
     process.exit(1);
