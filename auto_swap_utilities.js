@@ -3,7 +3,8 @@ import { ethers } from 'ethers';
 // Minimal ERC20 ABI for balance and decimals
 export const ERC20_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
-  "function decimals() view returns (uint8)"
+  "function decimals() view returns (uint8)",
+  "function approve(address spender, uint256 amount) returns (bool)"
 ];
 
 // Fallback provider builder
