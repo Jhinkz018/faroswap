@@ -6,6 +6,7 @@ import ora from 'ora';
 import { buildFallbackProvider, ERC20_ABI } from './auto_swap_utilities.js';
 import dotenv from 'dotenv';
 import inquirer from 'inquirer';
+import fs from 'fs';
 dotenv.config();
 
 const TOKENS = {
@@ -16,8 +17,6 @@ const TOKENS = {
   USDT: '0xD4071393f8716661958F766DF660033b3d35fD29',
   WPHRS: '0x3019B247381c850ab53Dc0EE53bCe7A07Ea9155f'
 };
-
-const POOL_ADDRESS = '0x596be65cf84c2ad87b8a17a3d4f10fc1359544ec';
 
 const PHAROS_CHAIN_ID = 688688;
 const PHAROS_RPC_URLS = [
@@ -120,46 +119,32 @@ async function batchSwap(wallet, from, to, value, count) {
   }
 }
 
-async function autoAddLiquidity(wallet) {
-  if (!TOKENS.WPHRS) {
-    console.error('❌ WPHRS address not configured');
-    return;
+function loadRecipients(path = 'wallets.txt') {
+  try {
+    const data = fs.readFileSync(path, 'utf8');
+    return data.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  } catch (e) {
+    console.error(`❌ Failed to read ${path}:`, e.message);
+    return [];
   }
-
-  const usdc = new ethers.Contract(TOKENS.USDC, ERC20_ABI, wallet);
-  const wphrs = new ethers.Contract(TOKENS.WPHRS, ERC20_ABI, wallet);
-  const poolAbi = ["function addLiquidity(uint256 amountUSDC, uint256 amountWPHRS) external"];
-  const pool = new ethers.Contract(POOL_ADDRESS, poolAbi, wallet);
-
-  const balance = await usdc.balanceOf(wallet.address);
-  const decimals = await usdc.decimals();
-
-  const minAmount = balance * BigInt(5) / BigInt(100);
-  const maxAmount = balance * BigInt(10) / BigInt(100);
-  const amountToUse = (minAmount + maxAmount) / BigInt(2);
-
-  console.log(`USDC to deposit: ${ethers.formatUnits(amountToUse, decimals)}`);
-
-  await usdc.approve(POOL_ADDRESS, amountToUse);
-  await wphrs.approve(POOL_ADDRESS, amountToUse);
-
-  const tx = await pool.addLiquidity(amountToUse, amountToUse);
-  await tx.wait();
-
-  console.log('✅ Liquidity added.');
 }
 
-async function batchAddLiquidity(wallet, count) {
+async function batchSendNative(wallet, recipients, amountWei, count) {
   for (let i = 0; i < count; i++) {
-    console.log(`\n💧 Add Liquidity #${i + 1} of ${count}`);
+    const to = recipients[i % recipients.length];
+    console.log(`\n🚀 Sending ${ethers.formatEther(amountWei)} PHRS to ${to} (#${i + 1}/${count})`);
     try {
-      await autoAddLiquidity(wallet);
+      const tx = await wallet.sendTransaction({ to, value: amountWei });
+      console.log(`TX Hash: ${tx.hash}`);
+      await tx.wait();
+      console.log('✅ Transaction confirmed!');
     } catch (e) {
-      console.error(`❌ Add liquidity #${i + 1} failed:`, e.message);
+      console.error(`❌ Send #${i + 1} failed:`, e.message);
     }
     await new Promise(r => setTimeout(r, 1000));
   }
 }
+
 
 async function mainMenu(wallet) {
   while (true) {
@@ -169,8 +154,9 @@ async function mainMenu(wallet) {
       message: 'Select an option',
       choices: [
         { name: 'Swap Tokens', value: 'swap' },
+        { name: 'Swap Tokens to PHRS', value: 'swap-native' },
         { name: 'Swap PHRS/WPHRS', value: 'swap-pair' },
-        { name: 'Auto-add Liquidity WPHRS/USDC', value: 'liquidity' },
+        { name: 'Send PHRS to Addresses', value: 'send' },
         { name: 'Show Balances', value: 'balance' },
         { name: 'Quit', value: 'quit' }
       ]
@@ -181,17 +167,20 @@ async function mainMenu(wallet) {
       process.exit(0);
     } else if (action === 'balance') {
       await showAllBalances(wallet.address, wallet.provider);
-    } else if (action === 'liquidity') {
-      const { count } = await inquirer.prompt({
-        type: 'input',
-        name: 'count',
-        message: '🔁 How many liquidity adds to perform?'
-      });
-      const num = parseInt(count);
-      if (isNaN(num) || num < 1) {
-        console.error('❌ Invalid count');
-      } else {
-        await batchAddLiquidity(wallet, num);
+    } else if (action === 'send') {
+      const answers = await inquirer.prompt([
+        { type: 'input', name: 'amount', message: '💸 Enter amount of PHRS to send:' },
+        { type: 'input', name: 'count', message: '🔁 How many transactions to perform?' }
+      ]);
+      try {
+        const value = ethers.parseEther(answers.amount);
+        const count = parseInt(answers.count);
+        if (isNaN(count) || count < 1) throw new Error('Invalid transaction count');
+        const recips = loadRecipients();
+        if (recips.length === 0) throw new Error('No addresses found in wallets.txt');
+        await batchSendNative(wallet, recips, value, count);
+      } catch (e) {
+        console.error('❌ Error:', e.message);
       }
     } else if (action === 'swap-pair') {
       const answers = await inquirer.prompt([
@@ -203,6 +192,25 @@ async function mainMenu(wallet) {
         const count = parseInt(answers.count);
         if (isNaN(count) || count < 1) throw new Error('Invalid swap count');
         await batchSwap(wallet, TOKENS.PHRS, TOKENS.WPHRS, value, count);
+      } catch (e) {
+        console.error('❌ Error:', e.message);
+      }
+    } else if (action === 'swap-native') {
+      const answers = await inquirer.prompt([
+        { type: 'input', name: 'symbol', message: '💱 Enter token symbol to swap FROM (e.g., WBTC):' },
+        { type: 'input', name: 'amount', message: '💸 Enter amount to swap:' },
+        { type: 'input', name: 'count', message: '🔁 How many swaps to perform?' }
+      ]);
+      try {
+        const fromAddr = TOKENS[answers.symbol.toUpperCase()];
+        if (!fromAddr || answers.symbol.toUpperCase() === 'PHRS') throw new Error('Invalid symbol');
+        const contract = new ethers.Contract(fromAddr, ERC20_ABI, wallet);
+        let decimals = 18;
+        try { decimals = await contract.decimals(); } catch {}
+        const value = ethers.parseUnits(answers.amount, decimals);
+        const count = parseInt(answers.count);
+        if (isNaN(count) || count < 1) throw new Error('Invalid swap count');
+        await batchSwap(wallet, fromAddr, TOKENS.PHRS, value, count);
       } catch (e) {
         console.error('❌ Error:', e.message);
       }

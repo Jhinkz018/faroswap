@@ -14,7 +14,8 @@ A command-line tool for batch token swaps on the Pharos testnet using the DODO r
 * 🌐 Fetches real-time DODO routes with slippage control
 * 🔐 Uses `.env` file to load your private key securely
 * 🚪 Interactive menu with a quit option
-* 💧 Auto-add liquidity for the WPHRS/USDC pair
+* 📤 Send PHRS to addresses listed in `wallets.txt`
+* ↩ Swap tokens back to the native PHRS token
 
 ---
 
@@ -64,7 +65,7 @@ npm start
 ```
 
 Use the interactive menu to select **Swap Tokens** and provide the token symbol, amount, and number of repeats when prompted.
-The menu also includes **Swap PHRS/WPHRS** and **Auto-add Liquidity WPHRS/USDC** to deposit 5-10% of your USDC balance.
+The menu also includes **Swap PHRS/WPHRS**, **Swap Tokens to PHRS**, and **Send PHRS** using the addresses in `wallets.txt`.
 
 ---
 
