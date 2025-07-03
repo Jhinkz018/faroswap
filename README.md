@@ -13,6 +13,7 @@ A command-line tool for batch token swaps on the Pharos testnet using the DODO r
 * 🎲 Random amount ranges for swaps and sends via `.env`
 * 🔄 Retries failed swaps automatically
 * ⏱ Timeout protection using `AbortController`
+* ⚡ Auto-swap or send using random amounts via the menu
 * 🌐 Fetches real-time DODO routes with slippage control
 * 🔐 Uses `.env` file to load one or more private keys securely
 * 🚪 Interactive menu with a quit option
@@ -72,8 +73,8 @@ On Pharos testnet:
 npm start
 ```
 
-Use the interactive menu to select **Swap Tokens** and provide the token symbol, amount, and number of repeats when prompted.
-The menu also includes **Swap PHRS/WPHRS**, **Swap Tokens to PHRS**, and **Send PHRS** using the addresses in `wallets.txt`.
+Use the interactive menu to select **Swap Tokens** or **Swap Tokens to PHRS** using a token list. You can also choose **AutoSwap (random amounts)** to automatically swap or send with amounts randomized from your `.env` ranges.
+The menu also includes **Swap PHRS/WPHRS** and **Send PHRS**, plus the new **AutoSwap (random amounts)** option.
 
 ---
 
