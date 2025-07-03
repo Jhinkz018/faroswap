@@ -26,6 +26,14 @@ const PHAROS_RPC_URLS = [
 
 let axiosInstance = axios.create();
 
+// Delay between consecutive transactions in milliseconds
+const MIN_TX_DELAY_MS = 40 * 1000; // 40 seconds
+const MAX_TX_DELAY_MS = 120 * 1000; // 120 seconds
+
+function randomTxDelay() {
+  return Math.floor(Math.random() * (MAX_TX_DELAY_MS - MIN_TX_DELAY_MS + 1)) + MIN_TX_DELAY_MS;
+}
+
 function readProxiesFromFile(filename) {
   try {
     const content = fs.readFileSync(filename, 'utf8');
@@ -139,7 +147,7 @@ async function batchSwap(wallet, from, to, value, count) {
     } catch (e) {
       console.error(`❌ Swap #${i + 1} failed:`, e.message);
     }
-    await new Promise(r => setTimeout(r, 1000)); // wait 1s between swaps
+    await new Promise(r => setTimeout(r, randomTxDelay()));
   }
 }
 
@@ -165,7 +173,7 @@ async function batchSendNative(wallet, recipients, amountWei, count) {
     } catch (e) {
       console.error(`❌ Send #${i + 1} failed:`, e.message);
     }
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, randomTxDelay()));
   }
 }
 
