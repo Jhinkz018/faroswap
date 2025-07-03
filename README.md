@@ -9,6 +9,8 @@ A command-line tool for batch token swaps on the Pharos testnet using the DODO r
 * ✅ Interactive CLI for swapping PHRS to other tokens (e.g. WETH, WBTC, USDC, USDT)
 * ↔ Swap PHRS directly to WPHRS
 * 🔁 Supports batch swaps with user-defined repeat count
+* ⏲ Adds a random delay (40-120s) between transactions
+* 🎲 Randomizes swap and send amounts between 0.1-0.9
 * 🔄 Retries failed swaps automatically
 * ⏱ Timeout protection using `AbortController`
 * 🌐 Fetches real-time DODO routes with slippage control
@@ -67,7 +69,7 @@ On Pharos testnet:
 npm start
 ```
 
-Use the interactive menu to select **Swap Tokens** and provide the token symbol, amount, and number of repeats when prompted.
+Use the interactive menu to select **Swap Tokens** and provide the token symbol and number of repeats. The amount for each transaction is randomly chosen between `0.1` and `0.9`.
 The menu also includes **Swap PHRS/WPHRS**, **Swap Tokens to PHRS**, and **Send PHRS** using the addresses in `wallets.txt`.
 
 ---
