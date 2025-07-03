@@ -5,6 +5,8 @@ import { ethers } from 'ethers';
 import { buildFallbackProvider, ERC20_ABI } from './auto_swap_utilities.js';
 import dotenv from 'dotenv';
 import inquirer from 'inquirer';
+import chalk from 'chalk';
+import figlet from 'figlet';
 import fs from 'fs';
 dotenv.config();
 
@@ -277,7 +279,16 @@ async function mainMenu(provider, wallet) {
 }
 
 (async () => {
-  console.log('\n🚀 Starting AutoSwap Executor by 0xm3th');
+  const banner = figlet.textSync('0xm3th');
+  const centered = banner
+    .split('\n')
+    .map(line => {
+      const pad = Math.floor((process.stdout.columns - line.length) / 2);
+      return ' '.repeat(Math.max(0, pad)) + line;
+    })
+    .join('\n');
+  console.log(chalk.bold(centered));
+  console.log('\n🚀 Starting AutoSwap Executor');
 
   const { useProxy } = await inquirer.prompt({
     type: 'confirm',
