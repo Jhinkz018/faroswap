@@ -330,6 +330,14 @@ async function mainMenu(provider, wallet) {
     console.log(`Using proxy: ${selectedProxy}`);
     const agent = new HttpsProxyAgent(selectedProxy);
     axiosInstance = axios.create({ httpAgent: agent, httpsAgent: agent });
+    try {
+      const ipRes = await axiosInstance.get('https://api.ipify.org?format=json', { timeout: 5000 });
+      if (ipRes?.data?.ip) {
+        console.log(`Connected to the IP: ${ipRes.data.ip}`);
+      }
+    } catch (err) {
+      console.warn(`Could not determine proxy IP: ${err.message}`);
+    }
   } else {
     axiosInstance = axios.create();
   }
