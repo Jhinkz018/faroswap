@@ -8,10 +8,10 @@
     "start": "node main.js"
   },
   "dependencies": {
-    "abort-controller": "^3.0.0",
+    "axios": "^1.6.7",
     "dotenv": "^16.3.1",
     "ethers": "^6.10.0",
-    "node-fetch": "^3.3.2",
+    "https-proxy-agent": "^7.0.2",
     "ora": "^6.3.1",
     "inquirer": "^9.2.8"
   }

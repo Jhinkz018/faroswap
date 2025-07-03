@@ -1,8 +1,7 @@
 // Auto-swap script with tx execution, retry + timeout, fallback RPC, and route decoding
-import fetch from 'node-fetch';
-import AbortController from 'abort-controller';
+import axios from 'axios';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import { ethers } from 'ethers';
-import ora from 'ora';
 import { buildFallbackProvider, ERC20_ABI } from './auto_swap_utilities.js';
 import dotenv from 'dotenv';
 import inquirer from 'inquirer';
@@ -22,6 +21,18 @@ const PHAROS_CHAIN_ID = 688688;
 const PHAROS_RPC_URLS = [
   'https://testnet.dplabs-internal.com'
 ];
+
+let axiosInstance = axios.create();
+
+function readProxiesFromFile(filename) {
+  try {
+    const content = fs.readFileSync(filename, 'utf8');
+    return content.split('\n').map(l => l.trim()).filter(Boolean);
+  } catch (err) {
+    console.log(`Failed to read ${filename}: ${err.message}`);
+    return [];
+  }
+}
 
 function loadPrivateKeys() {
   return Object.keys(process.env)
@@ -72,24 +83,11 @@ async function showAllBalances(address, provider) {
   }
 }
 
-async function fetchWithTimeout(url, timeout = 10000) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(id);
-    return res;
-  } catch (err) {
-    throw new Error('Timeout or network error');
-  }
-}
-
 async function robustFetchDodoRoute(url) {
   for (let i = 0; i < 3; i++) {
     try {
-      const res = await fetchWithTimeout(url);
-      const data = await res.json();
-      if (data.status !== -1) return data;
+      const res = await axiosInstance.get(url, { timeout: 10000 });
+      if (res.data.status !== -1) return res.data;
       console.warn(`Retry ${i + 1} DODO API status -1`);
     } catch (e) {
       console.warn(`Retry ${i + 1} failed:`, e.message);
@@ -280,6 +278,50 @@ async function mainMenu(provider, wallet) {
 
 (async () => {
   console.log('\n🚀 Starting AutoSwap Executor by 0xm3th');
+
+  const { useProxy } = await inquirer.prompt({
+    type: 'confirm',
+    name: 'useProxy',
+    message: 'Do you want to use a proxy?',
+    default: false
+  });
+
+  let proxyList = [];
+  let proxyMode = null;
+
+  if (useProxy) {
+    const { proxyType } = await inquirer.prompt({
+      type: 'list',
+      name: 'proxyType',
+      message: 'Select proxy type:',
+      choices: ['Rotating', 'Static']
+    });
+    proxyMode = proxyType;
+    proxyList = readProxiesFromFile('proxy.txt');
+    if (proxyList.length > 0) {
+      console.log(`${proxyList.length} proxies loaded.`);
+    } else {
+      console.log('proxy.txt is empty or missing, not using a proxy.');
+    }
+  }
+
+  if (useProxy && proxyList.length > 0) {
+    let selectedProxy;
+    if (proxyMode === 'Rotating') {
+      selectedProxy = proxyList[0];
+    } else {
+      selectedProxy = proxyList.shift();
+      if (!selectedProxy) {
+        console.log('No proxy left for static mode.');
+        process.exit(1);
+      }
+    }
+    console.log(`Using proxy: ${selectedProxy}`);
+    const agent = new HttpsProxyAgent(selectedProxy);
+    axiosInstance = axios.create({ httpAgent: agent, httpsAgent: agent });
+  } else {
+    axiosInstance = axios.create();
+  }
 
   const provider = await buildFallbackProvider(PHAROS_RPC_URLS, PHAROS_CHAIN_ID, 'pharos');
   try {

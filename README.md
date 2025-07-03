@@ -15,6 +15,7 @@ A command-line tool for batch token swaps on the Pharos testnet using the DODO r
 * 🔐 Uses `.env` file to load one or more private keys securely
 * 🚪 Interactive menu with a quit option
 * 🔄 Change wallet at runtime from the main menu
+* 🌐 Optional proxy support for API requests
 * 📤 Send PHRS to addresses listed in `wallets.txt`
 * ↩ Swap tokens back to the native PHRS token
 
