@@ -330,9 +330,7 @@ async function mainMenu(provider, wallet) {
           name: "count",
           message: "🔁 How many swaps to perform?"
         }
-      ]);
-        }
-      );
+        ]);
 
       try {
         if (!answers.amount || isNaN(answers.amount)) throw new Error('Invalid amount');
