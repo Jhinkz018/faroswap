@@ -332,7 +332,7 @@ async function mainMenu(provider, wallet) {
         }
       ]);
         }
-      ]);
+      );
 
       try {
         if (!answers.amount || isNaN(answers.amount)) throw new Error('Invalid amount');
