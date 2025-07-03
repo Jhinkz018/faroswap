@@ -26,6 +26,18 @@ const PHAROS_RPC_URLS = [
 
 let axiosInstance = axios.create();
 
+// Amount ranges for randomized swaps and sends
+const [MIN_SWAP_AMOUNT, MAX_SWAP_AMOUNT] = (process.env.AMOUNT_SWAP || '0.1,0.9')
+  .split(',')
+  .map(v => parseFloat(v.trim()));
+const [MIN_SEND_AMOUNT, MAX_SEND_AMOUNT] = (process.env.AMOUNT_SEND || '0.1,0.9')
+  .split(',')
+  .map(v => parseFloat(v.trim()));
+
+function randomAmount(min, max) {
+  return Math.random() * (max - min) + min;
+}
+
 // Delay between consecutive transactions in milliseconds
 const MIN_TX_DELAY_MS = 40 * 1000; // 40 seconds
 const MAX_TX_DELAY_MS = 120 * 1000; // 120 seconds
@@ -138,11 +150,14 @@ async function executeSwap(wallet, routeData) {
   }
 }
 
-async function batchSwap(wallet, from, to, value, count) {
+async function batchSwap(wallet, from, to, value, count, decimals = 18) {
   for (let i = 0; i < count; i++) {
+    const amountWei = process.env.AMOUNT_SWAP
+      ? ethers.parseUnits(randomAmount(MIN_SWAP_AMOUNT, MAX_SWAP_AMOUNT).toFixed(4), decimals)
+      : value;
     console.log(`\n🔁 Swap #${i + 1} of ${count}`);
     try {
-      const data = await fetchDodoRoute(from, to, wallet.address, value);
+      const data = await fetchDodoRoute(from, to, wallet.address, amountWei);
       await executeSwap(wallet, data);
     } catch (e) {
       console.error(`❌ Swap #${i + 1} failed:`, e.message);
@@ -164,9 +179,12 @@ function loadRecipients(path = 'wallets.txt') {
 async function batchSendNative(wallet, recipients, amountWei, count) {
   for (let i = 0; i < count; i++) {
     const to = recipients[i % recipients.length];
-    console.log(`\n🚀 Sending ${ethers.formatEther(amountWei)} PHRS to ${to} (#${i + 1}/${count})`);
+    const sendValue = process.env.AMOUNT_SEND
+      ? ethers.parseEther(randomAmount(MIN_SEND_AMOUNT, MAX_SEND_AMOUNT).toFixed(4))
+      : amountWei;
+    console.log(`\n🚀 Sending ${ethers.formatEther(sendValue)} PHRS to ${to} (#${i + 1}/${count})`);
     try {
-      const tx = await wallet.sendTransaction({ to, value: amountWei });
+      const tx = await wallet.sendTransaction({ to, value: sendValue });
       console.log(`TX Hash: ${tx.hash}`);
       await tx.wait();
       console.log('✅ Transaction confirmed!');
@@ -228,7 +246,7 @@ async function mainMenu(provider, wallet) {
         const value = ethers.parseEther(answers.amount);
         const count = parseInt(answers.count);
         if (isNaN(count) || count < 1) throw new Error('Invalid swap count');
-        await batchSwap(currentWallet, TOKENS.PHRS, TOKENS.WPHRS, value, count);
+        await batchSwap(currentWallet, TOKENS.PHRS, TOKENS.WPHRS, value, count, 18);
       } catch (e) {
         console.error('❌ Error:', e.message);
       }
@@ -247,7 +265,7 @@ async function mainMenu(provider, wallet) {
         const value = ethers.parseUnits(answers.amount, decimals);
         const count = parseInt(answers.count);
         if (isNaN(count) || count < 1) throw new Error('Invalid swap count');
-        await batchSwap(currentWallet, fromAddr, TOKENS.PHRS, value, count);
+        await batchSwap(currentWallet, fromAddr, TOKENS.PHRS, value, count, decimals);
       } catch (e) {
         console.error('❌ Error:', e.message);
       }
@@ -278,7 +296,7 @@ async function mainMenu(provider, wallet) {
         const value = ethers.parseEther(answers.amount);
         const count = parseInt(answers.count);
         if (isNaN(count) || count < 1) throw new Error('Invalid swap count');
-        await batchSwap(currentWallet, from, to, value, count);
+        await batchSwap(currentWallet, from, to, value, count, 18);
       } catch (e) {
         console.error('❌ Error:', e.message);
       }
