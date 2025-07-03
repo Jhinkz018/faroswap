@@ -12,7 +12,7 @@ A command-line tool for batch token swaps on the Pharos testnet using the DODO r
 * 🔄 Retries failed swaps automatically
 * ⏱ Timeout protection using `AbortController`
 * 🌐 Fetches real-time DODO routes with slippage control
-* 🔐 Uses `.env` file to load your private key securely
+* 🔐 Uses `.env` file to load one or more private keys securely
 * 🚪 Interactive menu with a quit option
 * 📤 Send PHRS to addresses listed in `wallets.txt`
 * ↩ Swap tokens back to the native PHRS token
@@ -33,12 +33,13 @@ npm install
 
 * `main.js` — main CLI logic
 * `auto_swap_utilities.js` — utility for ERC20 ABI & fallback RPC
-* `.env` — contains your private key (not committed)
+* `.env` — contains your private keys (not committed)
 
-Create your `.env` like this:
+Create your `.env` like this (use `PRIVATE_KEY1`, `PRIVATE_KEY2`, etc.):
 
 ```
-PRIVATE_KEY=0xyourprivatekeyhere
+PRIVATE_KEY1=0xyourfirstprivatekey
+PRIVATE_KEY2=0xyoursecondprivatekey
 ```
 
 ---

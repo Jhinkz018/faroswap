@@ -23,6 +23,30 @@ const PHAROS_RPC_URLS = [
   'https://testnet.dplabs-internal.com'
 ];
 
+function loadPrivateKeys() {
+  return Object.keys(process.env)
+    .filter(k => k.toUpperCase().startsWith('PRIVATE_KEY'))
+    .map(k => process.env[k])
+    .filter(pk => pk && pk.startsWith('0x') && pk.length === 66);
+}
+
+async function selectWallet(provider) {
+  const keys = loadPrivateKeys();
+  if (keys.length === 0) {
+    console.error('❌ No PRIVATE_KEY entries found in .env');
+    process.exit(1);
+  }
+  const wallets = keys.map(pk => new ethers.Wallet(pk, provider));
+  if (wallets.length === 1) return wallets[0];
+  const { idx } = await inquirer.prompt({
+    type: 'list',
+    name: 'idx',
+    message: 'Select wallet to use',
+    choices: wallets.map((w, i) => ({ name: w.address, value: i }))
+  });
+  return wallets[idx];
+}
+
 async function showAllBalances(address, provider) {
   console.log('\n💰 Token Balances:');
   try {
@@ -253,15 +277,8 @@ async function mainMenu(wallet) {
   console.log('\n🚀 Starting AutoSwap Executor by 0xm3th');
 
   const provider = await buildFallbackProvider(PHAROS_RPC_URLS, PHAROS_CHAIN_ID, 'pharos');
-  const pk = process.env.PRIVATE_KEY;
-
-  if (!pk || !pk.startsWith('0x') || pk.length !== 66) {
-    console.error('❌ Invalid or missing PRIVATE_KEY in .env');
-    process.exit(1);
-  }
-
   try {
-    const wallet = new ethers.Wallet(pk, provider);
+    const wallet = await selectWallet(provider);
     await showAllBalances(wallet.address, provider);
     await mainMenu(wallet);
   } catch (err) {
